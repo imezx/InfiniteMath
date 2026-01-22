@@ -1,3 +1,7 @@
+<div align="center">
+	<img src=".moonwave/static/logo.png" alt="icon" />
+</div>
+
 InfiniteMath is a module that allows you to surpass the double-precision floating-point number limit of `10^308`.
 
 Here's the [installation](https://kdudedev.github.io/InfiniteMath/docs/Installation) page, an in-depth [explanation](https://kdudedev.github.io/InfiniteMath/docs/Explanation) of the module, and API [documentation](https://kdudedev.github.io/InfiniteMath/api/InfiniteMath).
