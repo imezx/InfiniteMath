@@ -1,5 +1,3 @@
-![InfiniteMath](https://cdn.discordapp.com/attachments/542187455936462881/1072367668155383808/InfiniteMathLogo.png)
-
 InfiniteMath is a module that allows you to surpass the double-precision floating-point number limit of `10^308`.
 
 Here's the [installation](https://kdudedev.github.io/InfiniteMath/docs/Installation) page, an in-depth [explanation](https://kdudedev.github.io/InfiniteMath/docs/Explanation) of the module, and API [documentation](https://kdudedev.github.io/InfiniteMath/api/InfiniteMath).
