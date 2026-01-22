@@ -408,7 +408,7 @@ end
 	@param val number | string | table | Number
 	@return Number
 ]=]
-function InfiniteMath.new(val : number | string | {} | Number) : Number
+function InfiniteMath.new(val) : Number
 	local first, second
 
 	if type(val) == "table" then

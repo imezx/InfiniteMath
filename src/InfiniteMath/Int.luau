@@ -7,8 +7,6 @@ export type Int = typeof(setmetatable({
 	limbs = {} :: { number }, -- little-endian uint32 limbs (base 2^32)
 }, Int))
 
-local U32_BASE = 4294967296 -- 2^32
-
 local function trimLimbs(limbs: { number })
 	while #limbs > 0 and limbs[#limbs] == 0 do
 		table.remove(limbs)
@@ -36,7 +34,7 @@ local function assertBytes(bytes: { number })
 	for i = 1, #bytes do
 		local b = bytes[i]
 		if type(b) ~= "number" or b % 1 ~= 0 or b < 0 or b > 255 then
-			error(("bytes[%d] is not a valid byte (0..255 integer). Got: %s"):format(i, b))
+			error(("bytes[%d] is not a valid byte (0..255 integer). Got: %s"):format(i, `{b}`))
 		end
 	end
 end
