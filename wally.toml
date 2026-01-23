@@ -1,7 +1,7 @@
 [package]
 name = "imezx/infinite-math"
 description = "A module that allows you to have practically infinite numbers."
-version = "1.0.0"
+version = "1.0.1"
 license = "MIT"
 authors = ["KdudeDev", "noahrepublic", "foshesss", "iSophes", "EternityDev"]
 registry = "https://github.com/UpliftGames/wally-index"
