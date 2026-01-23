@@ -115,59 +115,52 @@ local function fixNumber(first, second): (number, number)
 	return x*sign, second
 end
 
-local function convert(number: number): (string, string)
+local function convert(number: number): (number, number)
 	if type(number) ~= "number" then
 		error('Type is not a "number".')
 	end
 
-	local sign = math.sign(number)
+	if number ~= number then
+		error("NaN is not supported.")
+	end
+	if number == math.huge or number == -math.huge then
+		error('INF is not supported as a number input. Use "1,1000" or "1e+1000".')
+	end
+
+	if number == 0 then
+		return 0, 0
+	end
+
+	local sign = if number < 0 then -1 else 1
 	number = math.abs(number)
 
-	-- get string representation
-	local numberStr = tostring(number)
-	local removed = 0
+	-- exponent guess
+	local e = math.floor(math.log10(number))
+	-- scale into ~[1,10)
+	local m = number / (10 ^ e)
 
-	if string.match(numberStr, "%.") and not string.match(numberStr, "e") then
-		local dot = numberStr:find(".", 1, true)
-		if dot then
-			local frac = numberStr:sub(dot + 1)
-			numberStr = `{numberStr:sub(1, dot - 1)}{frac}`
-			removed = #frac
-		end
+	if m >= 10 then
+		m /= 10
+		e += 1
+	elseif m < 1 then
+		m *= 10
+		e -= 1
 	end
 
-	local first
-	local second = #numberStr - 1 - removed
+	return m * sign, e
+end
 
-	if string.match(numberStr, "e") then
-		if string.match(numberStr, "+") then
-			second = numberStr:split("+")[2]
-		elseif string.match(numberStr, "-") then
-			second = numberStr:split("e")[2]
-		end
-		first = numberStr:split("e")[1]
-	elseif string.match(numberStr, "inf") then
-		second = "inf"
-		first = "inf"
-	elseif string.match(numberStr, "nan") then
-		second = "nan"
-		first = "nan"
-	else
-		if #numberStr == 1 then
-			first = number
-		else
-			local firstZ = numberStr:sub(1, 1)
-			local secondZ = numberStr:sub(2)
+local function isNumberObject(x: any): boolean
+	return type(x) == "table" and getmetatable(x) == Number
+end
 
-			if tonumber(secondZ) > 0 then
-				first = `{firstZ}.{secondZ}`
-			else
-				first = firstZ
-			end
-		end
-	end
+local function isFieldNaN(v: any): boolean
+	return v == "nan" or (type(v) == "number" and v ~= v)
+end
 
-	return first * sign, second
+local function isFieldInf(v: any): boolean
+	return v == "inf" or v == "-inf"
+		or (type(v) == "number" and (v == math.huge or v == -math.huge))
 end
 
 local function checkNumber<T>(a: T): T
@@ -285,10 +278,13 @@ function Number.__pow(a, power)
 
 	if type(power) ~= "number" then
 		power = power:Reverse()
+	elseif type(power) == "string" then
+		power = tonumber(power)
 	end
 
 	if power == math.huge or power ~= power or type(power) ~= "number" then
 		error(`'{power}' is not a valid power. If power is 'inf' you must keep it below 10^308.`)
+		return
 	end
 
 	local sign = InfiniteMath.sign(a)
@@ -408,7 +404,7 @@ end
 	@param val number | string | table | Number
 	@return Number
 ]=]
-function InfiniteMath.new(val) : Number
+function InfiniteMath.new(val : number | string | {} | Number) : Number
 	local first, second
 
 	if type(val) == "table" then
@@ -441,8 +437,11 @@ function InfiniteMath.new(val) : Number
 			first, second = convert(n)
 		end
 	elseif type(val) == 'number' then
-		if val == 1e+999 then
-			error('INF number is not allowed. Please use "string" or "table" instead of "number" to go above INF.')
+		if val ~= val then
+			error("NaN is not allowed.")
+		end
+		if val == math.huge or val == -math.huge then
+			error('INF number is not allowed. Please use "string" or "table" instead of "number" to go above INF (e.g. "1,1000" or "1e+1000").')
 		end
 
 		first, second = convert(val)
@@ -609,19 +608,21 @@ end
 ]=]
 function Number:ScientificNotation(abbreviation: boolean?, secondAbbreviation: boolean?): string
 	local first, second = fixNumber(self.first, self.second)
-	
+
 	first, second = `{first}`, `{second}`
 
 
 	local str = math.floor(first * 10^InfiniteMath.DECIMALPOINTS)/10^InfiniteMath.DECIMALPOINTS -- The * 10 / 10 controls decimal precision, more zeros = more decimals
 	local n = tonumber(second)
 	
-	if n > 1e+6 and secondAbbreviation ~= false then
+	if secondAbbreviation == false then
+		second = tostring(second)
+	elseif n > 1e+6 then
 		second = InfiniteMath.new(n)
 		if abbreviation ~= false then
-			second:GetSuffix(true)
+			second = second:GetSuffix(true)
 		else
-			second:ScientificNotation(nil, false)
+			second = second:ScientificNotation(nil, false)
 		end
 	end
 
@@ -788,7 +789,7 @@ end
 	@param Num number | string | table | Number
 	@return Number
 ]=]
-function InfiniteMath.round<T>(Num: T): T
+function InfiniteMath.round(Num): Number
 	Num = checkNumber(Num)
 
 	local first, second = fixNumber(Num.first, Num.second)
@@ -990,7 +991,7 @@ end
 	@param Num number | string | table | Number
 	@return Number
 ]=]
-function InfiniteMath.modf(Num): Number
+function InfiniteMath.modf(Num): (Number, number?)
 	Num = checkNumber(Num)
 	local sign = InfiniteMath.sign(Num)
 	Num *= sign
@@ -1052,6 +1053,135 @@ end
 ]=]
 function InfiniteMath.log10(Num): Number
 	return InfiniteMath.log(Num, 10)
+end
+
+--[=[
+	@within InfiniteMath
+
+	Checks if a value is nil (or an invalid constructed number).
+
+	This is meant as a "safe check" for external inputs / user data.
+
+	Returns true if:
+	- `x == nil`, OR
+	- `x` is a constructed `Number` but has missing fields (`first` or `second` is nil).
+
+	@param x any
+	@return boolean
+]=]
+function InfiniteMath.isNil(x: any): boolean
+	if x == nil then
+		return true
+	end
+	if isNumberObject(x) then
+		return x.first == nil or x.second == nil
+	end
+	return false
+end
+
+--[=[
+	@within InfiniteMath
+
+	Checks if a value is NaN.
+
+	Supported inputs:
+	- `number`: true if `x ~= x`
+	- constructed `Number`: true if either internal field is NaN-like
+	- `string`: true if it contains "nan"
+	- anything else: false
+
+	This function does NOT throw.
+
+	@param x any
+	@return boolean
+]=]
+function InfiniteMath.isNaN(x: any): boolean
+	if x == nil then
+		return false
+	end
+	if type(x) == "number" then
+		return x ~= x
+	end
+	if isNumberObject(x) then
+		return isFieldNaN(x.first) or isFieldNaN(x.second)
+	end
+	if type(x) == "string" then
+		return x == "nan"
+	end
+	return false
+end
+
+--[=[
+	@within InfiniteMath
+
+	Checks if a value is positive or negative infinity.
+
+	Supported inputs:
+	- `number`: true if `x == math.huge` or `x == -math.huge`
+	- constructed `Number`: true if either internal field is inf-like
+	- `string`: true if it equals "inf", "-inf"
+	- anything else: false
+
+	This function does NOT throw.
+
+	@param x any
+	@return boolean
+]=]
+function InfiniteMath.isInf(x: any): boolean
+	if x == nil then
+		return false
+	end
+	if type(x) == "number" then
+		return x == math.huge or x == -math.huge
+	end
+	if isNumberObject(x) then
+		return isFieldInf(x.first) or isFieldInf(x.second)
+	end
+	if type(x) == "string" then
+		return x == "inf" or x == "-inf"
+	end
+	return false
+end
+
+--[=[
+	@within InfiniteMath
+
+	Checks if a value represents exactly zero.
+
+	Note:
+	- For constructed `Number`s, it normalizes using `fixNumber`, so values like `{0, 1000}` are treated as zero.
+
+	Supported inputs:
+	- `number`
+	- constructed `Number`
+	- `string` (tries `tonumber`, and also supports `"0,123"` style)
+
+	This function does NOT throw.
+
+	@param x any
+	@return boolean
+]=]
+function InfiniteMath.isZero(x: any): boolean
+	if x == nil then
+		return false
+	end
+	if type(x) == "number" then
+		return x == 0
+	end
+	if isNumberObject(x) then
+		local f, e = fixNumber(x.first, x.second)
+		return f == 0 and e == 0
+	end
+	if type(x) == "string" then
+		local n = tonumber(x)
+		if n ~= nil then
+			return n == 0
+		end
+		-- "0,1234" style
+		local a = x:match("^%s*([+-]?%d*%.?%d+)%s*,")
+		return a ~= nil and tonumber(a) == 0
+	end
+	return false
 end
 
 InfiniteMath.Int = int(InfiniteMath)
