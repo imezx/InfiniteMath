@@ -65,11 +65,6 @@ local suffixes = require("@self/Values/Suffixes")
 local full_names = require("@self/Values/FullNames")
 local int = require("@self/Int")
 
--- Math operations
-local math_abs = math.abs
-local math_floor = math.floor
-local math_log10 = math.log10
-
 --[[ Private functions ]]--
 local function fastNew(first: number, second: number): Number
 	return setmetatable({ first = first, second = second }, Number)
@@ -98,10 +93,10 @@ local function normalize(first: number, second: number): (number, number)
 		return 0, 0
 	end
 	local sign = if first < 0 then -1 else 1
-	local m = math_abs(first)
+	local m = math.abs(first)
 
 	-- m is always a finite double here. cuz log10(m) is in [-308..308]
-	local k = math_floor(math_log10(m))
+	local k = math.floor(math.log10(m))
 	if k ~= 0 then
 		m /= pow10(k)
 		second += k
