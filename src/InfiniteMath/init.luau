@@ -202,11 +202,11 @@ end
 local function parseExpString(s: string): (number?, number?)
 	local m, e = s:match("^%s*([+-]?%d*%.?%d+)%s*,%s*([+-]?%d+)%s*$")
 	if not m then
-	  m, e = s:match("^%s*([+-]?%d*%.?%d+)%s*[eE]%s*([+-]?%d+)%s*$")
+		m, e = s:match("^%s*([+-]?%d*%.?%d+)%s*[eE]%s*([+-]?%d+)%s*$")
 	end
 	if not m then return nil end
 	return tonumber(m), tonumber(e)
-  end
+end
 
 -- math metamethods:
 function Number.__add(a, b)
@@ -506,7 +506,7 @@ function Number:GetSuffix(abbreviation: boolean?): string
 	if type(abbreviation) ~= "boolean" then
 		abbreviation = true
 	end
-	
+
 	local first, second = normalize(self.first, self.second)
 
 	if second < 3 then 
@@ -542,12 +542,17 @@ function Number:GetSuffix(abbreviation: boolean?): string
 	end
 
 	local secondRemainder = second % 3
-	first *= 10^secondRemainder
+	first *= smallPow10(secondRemainder)
 
 	local suffixIndex = math.floor(second/3)
-	local str = math.floor(first * 10^InfiniteMath.DECIMALPOINTS)/10^InfiniteMath.DECIMALPOINTS -- The * 10 / 10 controls decimal precision, more zeros = more decimals
+	local dp = InfiniteMath.DECIMALPOINTS
+	local scale = pow10(dp)
+	local str = math.floor(first * scale) / scale -- The * 10 / 10 controls decimal precision, more zeros = more decimals
 
-	local suffix = if abbreviation then suffixes[suffixIndex] else (full_names[suffixIndex] and " " .. full_names[suffixIndex] or nil)
+	local suffix = if abbreviation then suffixes[suffixIndex] else full_names[suffixIndex]
+	if not abbreviation and suffix ~= nil then
+		suffix = " " .. suffix
+	end
 
 	if suffixIndex > 0 then
 		if suffix ~= nil then
@@ -591,16 +596,14 @@ end
 function Number:ScientificNotation(abbreviation: boolean?, secondAbbreviation: boolean?): string
 	local first, second = normalize(self.first, self.second)
 
-	first, second = `{first}`, `{second}`
-
-
-	local str = math.floor(first * 10^InfiniteMath.DECIMALPOINTS)/10^InfiniteMath.DECIMALPOINTS -- The * 10 / 10 controls decimal precision, more zeros = more decimals
-	local n = tonumber(second)
+	local dp = InfiniteMath.DECIMALPOINTS
+	local scale = pow10(dp)
+	local str = math.floor(first * scale) / scale -- The * 10 / 10 controls decimal precision, more zeros = more decimals
 
 	if secondAbbreviation == false then
 		second = tostring(second)
-	elseif n > 1e+6 then
-		second = fastNew(n, 0)
+	elseif second > 1e+6 then
+		second = fastNew(second, 0)
 		if abbreviation ~= false then
 			second = second:GetSuffix(true)
 		else
@@ -664,7 +667,7 @@ function Number:aaNotation(): string
 	local first, second = normalize(self.first, self.second)
 
 	local secondRemainder = second % 3
-	first *= 10^secondRemainder
+	first *= smallPow10(secondRemainder)
 	local suffixIndex = math.floor(second / 3) - 4
 
 	if suffixIndex <= 0 then
@@ -683,7 +686,9 @@ function Number:aaNotation(): string
 		return self:ScientificNotation()
 	end
 
-	local str = math.floor(first * 10^InfiniteMath.DECIMALPOINTS) / 10^InfiniteMath.DECIMALPOINTS
+	local dp = InfiniteMath.DECIMALPOINTS
+	local scale = pow10(dp)
+	local str = math.floor(first * scale) / scale
 	return `{str}{suffix}`
 end
 
@@ -797,7 +802,7 @@ function InfiniteMath.ceil(Num): Number
 	local _first, second = normalize(Num.first, Num.second)
 	if second >= 300 then return Num end -- Rounding after 1e+300 would be pointless, so don't do it.
 
-	return fastNew(math.ceil(Num:Reverse()))
+	return fastNew(math.ceil(Num:Reverse()), 0)
 end
 
 --[=[
