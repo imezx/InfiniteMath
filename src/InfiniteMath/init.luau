@@ -200,17 +200,16 @@ function Number.__add(a, b)
 
 	local first1, second1 = a.first, a.second
 	local first2, second2 = b.first, b.second
-	if math.abs(second1 - second2) > THRESHOLD then -- Check if difference in exponents is greater than threshold
+	local difference = second1 - second2
+
+	if math.abs(difference) > THRESHOLD then -- Check if difference in exponents is greater than threshold
 		if math.max(second1, second2) == second1 then
 			return fastNew(first1, second1)
 		end
-
 		return fastNew(first2, second2)
 	end
 
-	local difference = second1 - second2
 	first2 *= SMALL_POW10[-difference + THRESHOLD + 1]
-
 	first1, second1 = normalize(first1 + first2, second1)
 
 	return fastNew(first1 , second1)
@@ -221,17 +220,16 @@ function Number.__sub(a, b)
 
 	local first1, second1 = a.first, a.second
 	local first2, second2 = b.first, b.second
-	if math.abs(second1 - second2) > THRESHOLD then -- Check if difference in exponents is greater than threshold
+	local difference = second1 - second2
+
+	if math.abs(difference) > THRESHOLD then -- Check if difference in exponents is greater than threshold
 		if math.max(second1, second2) == second1 then
 			return fastNew(first1 ,second1)
 		end
-
 		return fastNew(first2, second2)
 	end
 
-	local difference = second1 - second2
 	first2 *= SMALL_POW10[-difference + THRESHOLD + 1]
-
 	first1, second1 = normalize(first1 - first2, second1)
 
 	return fastNew(first1 , second1)
