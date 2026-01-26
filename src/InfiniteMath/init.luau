@@ -199,6 +199,15 @@ local function cmp(a: Number, b: Number): number
 	return 0
 end
 
+local function parseExpString(s: string): (number?, number?)
+	local m, e = s:match("^%s*([+-]?%d*%.?%d+)%s*,%s*([+-]?%d+)%s*$")
+	if not m then
+	  m, e = s:match("^%s*([+-]?%d*%.?%d+)%s*[eE]%s*([+-]?%d+)%s*$")
+	end
+	if not m then return nil end
+	return tonumber(m), tonumber(e)
+  end
+
 -- math metamethods:
 function Number.__add(a, b)
 	a, b = coerce(a), coerce(b)
@@ -396,9 +405,9 @@ function InfiniteMath.new(val : number | string | {} | Number) : Number
 		first = val[1]
 		second = val[2]
 	elseif type(val) == "string" then
-		local mantStr, expStr = val:match("^%s*([+-]?%d*%.?%d+)%s*,%s*([+-]?%d+)%s*$")
+		local mantStr, expStr = parseExpString(val)
 		if mantStr and expStr then
-			first, second = normalize(tonumber(mantStr), tonumber(expStr))
+			first, second = normalize(mantStr, expStr)
 		else
 			local n = tonumber(val)
 			if n == nil then
