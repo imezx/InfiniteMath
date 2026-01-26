@@ -252,10 +252,10 @@ end
 function Number.__pow(a, power)
 	a = coerce(a)
 
-	if type(power) ~= "number" then
-		power = power:Reverse()
-	elseif type(power) == "string" then
+	if type(power) == "string" then
 		power = tonumber(power)
+	elseif type(power) == "table" and getmetatable(power) == Number then
+		power = power:Reverse()
 	end
 
 	if power == math.huge or power ~= power or type(power) ~= "number" then
@@ -998,9 +998,12 @@ function InfiniteMath.log(Num, Base): Number
 		Base = 2.7182818
 	end
 
-	local first, second = normalize(Num.first, Num.second)
+	local f, e = normalize(Num.first, Num.second)
 
-	return fastNew(math.log(first, Base) + second * math.log(10, Base))
+	-- log_base(Num) = log_base(f) + e * log_base(10)
+	local term1 = InfiniteMath.new(e) * math.log(10, Base)
+	local term2 = InfiniteMath.new(math.log(f, Base))
+	return term1 + term2
 end
 
 --[=[
