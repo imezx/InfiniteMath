@@ -75,6 +75,11 @@ local function pow10(e: number): number
 	return POW10[e + 309] or (10 ^ e)
 end
 
+local function smallPow10(e: number): number
+	-- e must be integer here
+	return SMALL_POW10[e + THRESHOLD + 1] or (10 ^ e)
+end
+
 local function normalize(first: number, second: number): (number, number)
 	if first == 0 then
 		return 0, 0
@@ -209,7 +214,7 @@ function Number.__add(a, b)
 		return fastNew(first2, second2)
 	end
 
-	first2 *= SMALL_POW10[-difference + THRESHOLD + 1]
+	first2 *= smallPow10(-difference)
 	first1, second1 = normalize(first1 + first2, second1)
 
 	return fastNew(first1 , second1)
@@ -229,7 +234,7 @@ function Number.__sub(a, b)
 		return fastNew(first2, second2)
 	end
 
-	first2 *= SMALL_POW10[-difference + THRESHOLD + 1]
+	first2 *= smallPow10(-difference)
 	first1, second1 = normalize(first1 - first2, second1)
 
 	return fastNew(first1 , second1)
