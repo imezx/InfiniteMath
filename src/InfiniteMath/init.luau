@@ -70,19 +70,6 @@ local function fastNew(first: number, second: number): Number
 	return setmetatable({ first = first, second = second }, Number)
 end
 
-local function coerce(x: any): Number
-	if type(x) == "table" and getmetatable(x) == Number then
-		return x
-	elseif type(x) == "number" then
-		return fastNew(x, 0)
-	elseif type(x) == "string" then
-		return InfiniteMath.new(x)
-	end
-	local f = x.first or x[1]
-	local e = x.second or x[2]
-	return fastNew(f, e)
-end
-
 local function pow10(e: number): number
 	-- e must be integer here
 	return POW10[e + 309] or (10 ^ e)
@@ -109,6 +96,20 @@ local function normalize(first: number, second: number): (number, number)
 		second -= 1
 	end
 	return m * sign, second
+end
+
+local function coerce(x: any): Number
+	if type(x) == "table" and getmetatable(x) == Number then
+		return x
+	elseif type(x) == "number" then
+		return fastNew(x, 0)
+	elseif type(x) == "string" then
+		return InfiniteMath.new(x)
+	end
+	local f = x.first or x[1]
+	local e = x.second or x[2]
+	f, e = normalize(f, e)
+	return fastNew(f, e)
 end
 
 local function convert(number: number): (number, number)
