@@ -80,6 +80,10 @@ local function smallPow10(e: number): number
 	return SMALL_POW10[e + THRESHOLD + 1] or (10 ^ e)
 end
 
+local function isInt(x: number): boolean
+	return x % 1 == 0
+end
+
 local function normalize(first: number, second: number): (number, number)
 	if first == 0 then
 		return 0, 0
@@ -103,18 +107,35 @@ local function normalize(first: number, second: number): (number, number)
 	return m * sign, second
 end
 
-local function coerce(x: any): Number
-	if type(x) == "table" and getmetatable(x) == Number then
-		return x
-	elseif type(x) == "number" then
-		return fastNew(x, 0)
-	elseif type(x) == "string" then
-		return InfiniteMath.new(x)
+local function normalize2(first: number, second: number): (number, number)
+	if first == 0 then
+		return 0, 0
 	end
-	local f = x.first or x[1]
-	local e = x.second or x[2]
-	f, e = normalize(f, e)
-	return fastNew(f, e)
+
+	local sign = if first < 0 then -1 else 1
+	local m = math.abs(first)
+
+	if m >= 10 then
+		m /= 10
+		second += 1
+		if m >= 10 then
+			m /= 10
+			second += 1
+		end
+	elseif m < 1 then
+		m *= 10
+		second -= 1
+		if m < 1 then
+			m *= 10
+			second -= 1
+		end
+	end
+
+	if m >= 10 or m < 1 then
+		return normalize(sign * m, second)
+	end
+
+	return sign * m, second
 end
 
 local function convert(number: number): (number, number)
@@ -151,6 +172,21 @@ local function convert(number: number): (number, number)
 	return m * sign, e
 end
 
+local function coerce(x: any): Number
+	if type(x) == "table" and getmetatable(x) == Number then
+		return x
+	elseif type(x) == "number" then
+		local f, e = convert(x)
+		return fastNew(f, e)
+	elseif type(x) == "string" then
+		return InfiniteMath.new(x)
+	end
+	local f = x.first or x[1]
+	local e = x.second or x[2]
+	f, e = normalize(f, e)
+	return fastNew(f, e)
+end
+
 local function isNumberObject(x: any): boolean
 	return type(x) == "table" and getmetatable(x) == Number
 end
@@ -182,7 +218,6 @@ local function cmp(a: Number, b: Number): number
 	if s1 == 0 then return 0 end
 
 	-- magnitude
-	local af1, af2 = math.abs(f1), math.abs(f2)
 	if e1 ~= e2 then
 		if s1 > 0 then
 			return (e1 < e2) and -1 or 1
@@ -190,19 +225,16 @@ local function cmp(a: Number, b: Number): number
 		return (e1 > e2) and -1 or 1 -- inverted for negatives
 	end
 
-	if af1 ~= af2 then
-		if s1 > 0 then
-			return (af1 < af2) and -1 or 1
-		end
-		return (af1 > af2) and -1 or 1
+	if f1 ~= f2 then
+		return (f1 < f2) and -1 or 1
 	end
 	return 0
 end
 
 local function parseExpString(s: string): (number?, number?)
-	local m, e = s:match("^%s*([+-]?%d*%.?%d+)%s*,%s*([+-]?%d+)%s*$")
+	local m, e = string.match(s, "^%s*([+-]?%d*%.?%d+)%s*,%s*([+-]?%d+)%s*$")
 	if not m then
-		m, e = s:match("^%s*([+-]?%d*%.?%d+)%s*[eE]%s*([+-]?%d+)%s*$")
+		m, e = string.match(s, "^%s*([+-]?%d*%.?%d+)%s*[eE]%s*([+-]?%d+)%s*$")
 	end
 	if not m then return nil end
 	return tonumber(m), tonumber(e)
@@ -251,13 +283,13 @@ end
 
 function Number.__mul(a, b)
 	a = coerce(a); b = coerce(b)
-	local rf, re = normalize(a.first * b.first, a.second + b.second)
+	local rf, re = normalize2(a.first * b.first, a.second + b.second)
 	return fastNew(rf, re)
 end
 
 function Number.__div(a, b)
 	a = coerce(a); b = coerce(b)
-	local rf, re = normalize(a.first / b.first, a.second - b.second)
+	local rf, re = normalize2(a.first / b.first, a.second - b.second)
 	return fastNew(rf, re)
 end
 
@@ -274,44 +306,50 @@ function Number.__pow(a, power)
 		error(`'{power}' is not a valid power. If power is 'inf' you must keep it below 10^308.`)
 		return
 	end
-
-	local sign = InfiniteMath.sign(a)
-	a *= sign
-
-	local first, second = normalize(a.first, a.second)
-	local n, n2 = first^power, second * power
-
-	if n == math.huge or n2 == math.huge then
-		if type(power) ~= "number" then
-			power = power:Reverse()
-		end
-
-		local answer = fastNew(1, 0)
-
-		local firstAnswer, secondAnswer
-
-		if power > 1 then
-			while power > 0 do
-				local lastBit = (bit32.band(power, 1) == 1)
-
-				if lastBit then
-					answer *= a
-				end
-
-				a *= a
-
-				power = bit32.rshift(power, 1)
-			end
-
-			firstAnswer, secondAnswer = normalize(answer.first, answer.second)
-		elseif power == 0 then
-			firstAnswer, secondAnswer = 1, 0
-		else
-			firstAnswer, secondAnswer = first, second
-		end
-		return fastNew(firstAnswer, secondAnswer)
+	
+	if power == 0 then
+		return fastNew(1, 0)
 	end
-	return fastNew(n, n2) * sign
+	
+	local f = a.first
+	local e = a.second
+
+	if f == 0 then
+		if power < 0 then
+			error("0 cannot be raised to a negative power")
+		end
+		return fastNew(0, 0)
+	end
+
+	local sign = 1
+	if f < 0 then
+		if not isInt(power) then
+			return fastNew(0/0, 0/0)
+		end
+		if (power % 2) ~= 0 then
+			sign = -1
+		end
+		f = -f
+	end
+
+	-- log10(|a|) = log10(f) + e
+	local y = power * (math.log10(f) + e)
+	if y ~= y then
+		return fastNew(0/0, 0/0)
+	end
+	if y == math.huge or y == -math.huge then
+		error("result exponent overflow")
+	end
+
+	local newE = math.floor(y)
+	local newF = 10 ^ (y - newE) -- in [1,10)
+
+	if newF >= 10 then
+		newF /= 10
+		newE += 1
+	end
+
+	return fastNew(newF * sign, newE)
 end
 
 function Number.__mod(a, b)
@@ -517,16 +555,16 @@ function Number:GetSuffix(abbreviation: boolean?): string
 		if math.abs(first) >= 1 then
 			if InfiniteMath.DECIMALPOINTS > 0 then
 				result = result:sub(1, second + Length + InfiniteMath.DECIMALPOINTS)
-				local decimal = result:split(".")[2]
+				local decimal = string.split(result, ".")[2]
 				if decimal == nil then return result end
 
 				if tonumber(decimal) == 0 then
-					result = result:split(".")[1]
+					result = string.split(result, ".")[1]
 				elseif decimal == string.rep(9 :: any, InfiniteMath.DECIMALPOINTS) then
-					result = tonumber(result:split(".")[1]) + 1
+					result = tonumber(string.split(result, ".")[1]) + 1
 				end
 			else
-				result = result:split(".")[1]
+				result = string.split(result, ".")[1]
 			end
 		else
 			if math.abs(first) <= .01 then return "0" end
@@ -534,7 +572,7 @@ function Number:GetSuffix(abbreviation: boolean?): string
 			local decimal = result:split(".")[2]
 
 			if decimal == string.rep(9 :: any, InfiniteMath.DECIMALPOINTS) then
-				result = tonumber(result:split(".")[1]) + 1
+				result = tonumber(string.split(result, ".")[1]) + 1
 			end
 		end
 
@@ -643,7 +681,7 @@ function Number:LogarithmNotation(): string
 
 	if string.match(log, "%.") then
 		log = string.split(log, ".")
-		log = log[2]:sub(1, 3)
+		log = string.sub(log[2], 1, 3)
 	end
 
 	return `e{second}.{log}`
@@ -708,7 +746,7 @@ function Number:ConvertForLeaderboards(): number
 	local first, second = normalize(self.first, self.second)
 	first, second = `{first}`, `{second}`
 
-	first = first:gsub("%.", "")
+	first = string.gsub(first, "%.", "")
 
 	return math.floor(tonumber(`{second}.{first:sub(1, LEADERBOARDPOINT)}`) * LEADERBOARDPRECISION)
 end
@@ -737,12 +775,12 @@ function InfiniteMath:ConvertFromLeaderboards(GivenNumber: number): Number
 	num /= LEADERBOARDPRECISION
 	num = `{num}`
 
-	local numbers = num:split('.')
+	local numbers = string.split('.')
 	local second, first = numbers[1], numbers[2]
 	first, second = `{first}`, `{second}`
 
-	local firstFirst = first:sub(1, 1)
-	local firstSecond = first:sub(2)
+	local firstFirst = string.sub(first, 1, 1)
+	local firstSecond = string.sub(first, 2)
 
 	first = `{firstFirst}.{firstSecond}`
 
@@ -977,14 +1015,15 @@ function InfiniteMath.modf(Num): (Number, number?)
 	local firstSplit = tostring(first):split(".")
 
 	if firstSplit[2] ~= nil then
-		first = firstSplit[2]:sub(1, second)
+		first = string.sub(firstSplit[2], 1, second)
 		first = firstSplit[1].."."..first
 
 		local power = if second == 0 then 2 else second
 		local decimal
 
 		if second > 0 then
-			decimal = firstSplit[2]:sub(power + 1) / 10^#firstSplit[2]:sub(power + 1)
+			local a = string.sub(firstSplit[2], power + 1)
+			decimal = a / 10^#a
 		else
 			decimal = firstSplit[2] / 10^#firstSplit[2]
 		end
