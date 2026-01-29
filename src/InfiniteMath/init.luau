@@ -324,7 +324,7 @@ function Number.__pow(a, power)
 	local sign = 1
 	if f < 0 then
 		if not isInt(power) then
-			return fastNew(0/0, 0/0)
+			return fastNew(NaN, NaN)
 		end
 		if (power % 2) ~= 0 then
 			sign = -1
@@ -335,7 +335,7 @@ function Number.__pow(a, power)
 	-- log10(|a|) = log10(f) + e
 	local y = power * (math.log10(f) + e)
 	if y ~= y then
-		return fastNew(0/0, 0/0)
+		return fastNew(NaN, NaN)
 	end
 	if y == math.huge or y == -math.huge then
 		error("result exponent overflow")
