@@ -766,7 +766,6 @@ end
 	@return Number
 ]=]
 function InfiniteMath:ConvertFromLeaderboards(GivenNumber: number): Number
-	--return 0
 	local num = GivenNumber
 	if num == 0 then
 		return fastNew(0, 0)
@@ -775,7 +774,7 @@ function InfiniteMath:ConvertFromLeaderboards(GivenNumber: number): Number
 	num /= LEADERBOARDPRECISION
 	num = `{num}`
 
-	local numbers = string.split('.')
+	local numbers = string.split(num, '.')
 	local second, first = numbers[1], numbers[2]
 	first, second = `{first}`, `{second}`
 
