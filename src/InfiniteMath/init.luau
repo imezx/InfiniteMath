@@ -8,7 +8,7 @@
 	InfiniteMath is module that allows you to surpass the limit of -10^308 to 10^308, with a new limit of -10^^308 to 10^^308 (1 with 10^308 zeros)
 
 	InfiniteMath has many of the functions from the math library, as well as metamethods for arithmatic and comparison.
-	
+
 	Datastores and OrderedDataStores are supported, with special functions for OrderedDataStores.
 ]=]
 
@@ -48,7 +48,9 @@ export type Number = typeof(setmetatable({
 --[[ Private variables ]]--
 
 local THRESHOLD = 16
-local LEADERBOARDPRECISION, LEADERBOARDPOINT = 10000, 5
+local LEADERBOARDPRECISION = 10000
+local LEADERBOARDLIMIT = 2^53
+local LEADERBOARDMAXSECOND = math.floor((LEADERBOARDLIMIT - 9999) / LEADERBOARDPRECISION)
 local NaN = 0/0
 local POW10 = table.create(617)
 local SMALL_POW10 = table.create(2*THRESHOLD + 1)
@@ -306,11 +308,11 @@ function Number.__pow(a, power)
 		error(`'{power}' is not a valid power. If power is 'inf' you must keep it below 10^308.`)
 		return
 	end
-	
+
 	if power == 0 then
 		return fastNew(1, 0)
 	end
-	
+
 	local f = a.first
 	local e = a.second
 
@@ -432,7 +434,7 @@ function InfiniteMath.new(val : number | string | {} | Number) : Number
 	local first, second
 
 	if type(val) == "table" then
-		if val.first ~= nil and val.second ~= nil then 
+		if val.first ~= nil and val.second ~= nil then
 			if getmetatable(val) ~= Number then
 				return setmetatable(val, Number)
 			end
@@ -547,7 +549,7 @@ function Number:GetSuffix(abbreviation: boolean?): string
 
 	local first, second = normalize(self.first, self.second)
 
-	if second < 3 then 
+	if second < 3 then
 		local result = `{self:Reverse()}`
 		local Length = 2
 		if math.sign(first) == -1 then Length = 3 end
@@ -611,7 +613,7 @@ end
 	```lua
 		print(InfiniteMath.new(1000):ScientificNotation()) -- 1e+3
 	```
-	
+
 	When a number reaches `1e+1000000` you can choose an abbreviation mode for the amount of zeros in the scientific notation. By default, it will use GetSuffix on the exponent `1e+1M`, but you can also choose to have it use scientific notation `1e+1e+6`.
 
 	```lua
@@ -621,7 +623,7 @@ end
 	```
 
 	You can also use nil and false to stop the functionality and instead just display `1e+1000000`.
-	
+
 	```lua
 		print(InfiniteMath.new("1, 1e+6"):ScientificNotation(nil, false)) -- 1e+1000000
 	```
@@ -692,8 +694,8 @@ local Alphabet = {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m
 --[=[
 	@within Number
 
-	Returns a string with the number formatted in double letter notation. Use the AALENGTHMAX property to adjust the max letters possible. 
-	
+	Returns a string with the number formatted in double letter notation. Use the AALENGTHMAX property to adjust the max letters possible.
+
 	```lua
 		print(InfiniteMath.new(1e+15):aaNotation()) -- 1a
 	```
@@ -735,6 +737,8 @@ end
 
 	Returns a number that you can use for OrderedDataStores in order to create global leaderboards that support InfiniteMath constructed numbers.
 
+	Numbers keep full precision up to an exponent of ~9e11 (the result must stay within the exact integer range of a double / OrderedDataStore). Above that, the result is clamped to the maximum representable value, so leaderboards above the cap remain correctly ordered. Negative numbers are not supported and will error.
+
 	```lua
 		print(InfiniteMath.new(1000):ConvertForLeaderboards()) -- 31000
 	```
@@ -744,17 +748,24 @@ end
 ]=]
 function Number:ConvertForLeaderboards(): number
 	local first, second = normalize(self.first, self.second)
-	first, second = `{first}`, `{second}`
+	if first < 0 then
+		error("ConvertForLeaderboards does not support negative numbers")
+	end
 
-	first = string.gsub(first, "%.", "")
+	local encoded = math.abs(second) * LEADERBOARDPRECISION + math.floor(first * 1000)
+	if encoded > LEADERBOARDMAXSECOND * LEADERBOARDPRECISION + 9999 then
+		return LEADERBOARDMAXSECOND * LEADERBOARDPRECISION + 9999
+	end
 
-	return math.floor(tonumber(`{second}.{first:sub(1, LEADERBOARDPOINT)}`) * LEADERBOARDPRECISION)
+	return if second < 0 then -encoded else encoded
 end
 
 --[=[
 	@within InfiniteMath
 
 	Returns a constructed number, and should be given a number created by `Number:ConvertForLeaderboards`. This is what you will display on global leaderboards using OrderedDataStores.
+
+	Values clamped by `Number:ConvertForLeaderboards` decode to the cap value `9.999e+900719925473`.
 
 	```lua
 		local ValueFromStore = InfiniteMath.new(1000):ConvertForLeaderboards()
@@ -771,19 +782,10 @@ function InfiniteMath:ConvertFromLeaderboards(GivenNumber: number): Number
 		return fastNew(0, 0)
 	end
 
-	num /= LEADERBOARDPRECISION
-	num = `{num}`
+	local second = math.floor(math.abs(num) / LEADERBOARDPRECISION)
+	local first = (math.abs(num) % LEADERBOARDPRECISION) / 1000
 
-	local numbers = string.split(num, '.')
-	local second, first = numbers[1], numbers[2]
-	first, second = `{first}`, `{second}`
-
-	local firstFirst = string.sub(first, 1, 1)
-	local firstSecond = string.sub(first, 2)
-
-	first = `{firstFirst}.{firstSecond}`
-
-	return fastNew(tonumber(first), tonumber(second))
+	return fastNew(first, if num < 0 then -second else second)
 end
 
 --[[ Math methods ]]--
@@ -896,7 +898,7 @@ end
 --[=[
 	@within InfiniteMath
 
-	Returns the smallest number among the given arguments 
+	Returns the smallest number among the given arguments
 
 	@param ... number | string | table | Number
 	@return Number
@@ -956,7 +958,7 @@ end
 	@within InfiniteMath
 
 	Returns the sign of the number. Negative numbers return -1, positive numbers return 1, 0 returns 0.
-	
+
 	@param Num number | string | table | Number
 	@return number
 ]=]
@@ -1000,7 +1002,7 @@ end
 --[=[
 	@within InfiniteMath
 
-	Returns both the integral part of n and the fractional part (if there is one). 
+	Returns both the integral part of n and the fractional part (if there is one).
 
 	@param Num number | string | table | Number
 	@return Number
@@ -1035,7 +1037,7 @@ end
 
 --[=[
 	@within InfiniteMath
-	
+
 	Returns the logarithm of x with the given base. Default base is constant e (2.7182818)
 
 	@param Num number | string | table | Number
@@ -1045,7 +1047,7 @@ end
 function InfiniteMath.log(Num, Base): Number
 	Num = checkNumber(Num)
 
-	if InfiniteMath.sign(Num) == -1 then 
+	if InfiniteMath.sign(Num) == -1 then
 		return NaN  -- log of a negative number is always nan
 	end
 
